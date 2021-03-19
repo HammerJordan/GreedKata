@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace GreedKata.Greed
@@ -25,27 +26,19 @@ namespace GreedKata.Greed
             {6, 600},
         };
 
-        public int Calculate(int[] diceRolls)
+        public int Calculate(params int[] diceRolls)
         {
             int calculatedScore = 0;
+            var rollCounts = GetRollCounts(diceRolls);
 
-           var rollCounts = GetRollCounts(diceRolls);
-
-           if (rollCounts.Any(x => x.Value > 2))
-           {
-               var tripleRollKeys = rollCounts
-                   .Where(x => x.Value > 2)
-                   .Select(x => x.Key);
-
-               foreach (int key in tripleRollKeys)
-               {
-                   calculatedScore += tripleDiceScoreLookup[key];
-                   rollCounts[key] -= 3;
-                   if (rollCounts[key] == 0)
-                       rollCounts.Remove(key);
-               }
-           }
-
+            for (int i = 6; i >= 3; i--)
+            {
+                if (HasPairAmount(rollCounts, i))
+                {
+                    int multiplier = GetScoreDuplicatedMultiplier(i);
+                    calculatedScore += ApplyScoreForDuplicateRolls(rollCounts, i, multiplier);
+                }
+            }
 
             calculatedScore += rollCounts
                 .Sum(die => singleDiceScoreLookup[die.Key]);
@@ -53,37 +46,39 @@ namespace GreedKata.Greed
             return calculatedScore;
         }
 
-        private bool HasTriple(int[] dice, out int diceNumber)
+        private int GetScoreDuplicatedMultiplier(int amount)
         {
-            bool foundUnique = false;
-            diceNumber = 0;
-
-            for (int i = 0; i < dice.Length; i++)
+            return amount switch
             {
-                int rollNumber = dice[i];
-                var rollCount = 1;
+                6 => 8,
+                5 => 4,
+                4 => 2,
+                _ => 1
+            };
+        }
 
-                for (int j = i + 1; j < dice.Length; j++)
-                {
-                    if (rollNumber == dice[j])
-                        rollCount++;
-                    else if (!foundUnique)
-                    {
-                        foundUnique = true;
-                        i = j;
-                    }
-                }
+        private bool HasPairAmount(Dictionary<int, int> rollCounts, int pair)
+        {
+            return rollCounts.Any(x => x.Value >= pair);
+        }
 
-                if (rollCount > 2)
-                {
-                    diceNumber = rollNumber;
-                    return true;
-                }
+        private int ApplyScoreForDuplicateRolls(Dictionary<int, int> rollCounts, int pair, int multiplier = 1)
+        {
+            int score = 0;
 
-                foundUnique = false;
+            var duplicateRolls = rollCounts
+                .Where(x => x.Value >= pair)
+                .Select(x => x.Key);
+
+            foreach (int key in duplicateRolls)
+            {
+                score += tripleDiceScoreLookup[key] * multiplier;
+                rollCounts[key] -= pair;
+                if (rollCounts[key] == 0)
+                    rollCounts.Remove(key);
             }
 
-            return false;
+            return score;
         }
 
         private Dictionary<int, int> GetRollCounts(int[] rolls)
